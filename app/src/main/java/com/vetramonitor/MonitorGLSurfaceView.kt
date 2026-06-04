@@ -3,6 +3,7 @@ package com.vetramonitor
 import android.content.Context
 import android.opengl.GLSurfaceView
 import android.util.AttributeSet
+import android.view.GestureDetector
 import android.view.MotionEvent
 
 /**
@@ -15,6 +16,22 @@ class MonitorGLSurfaceView @JvmOverloads constructor(
 ) : GLSurfaceView(context, attrs) {
 
     private var viewModel: MonitorViewModel? = null
+    private var onDoubleTap: (() -> Unit)? = null
+    private val gestures = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+        override fun onDown(event: MotionEvent): Boolean = true
+
+        override fun onSingleTapConfirmed(event: MotionEvent): Boolean {
+            val xNorm = (event.x / width).coerceIn(0f, 1f)
+            val yNorm = (event.y / height).coerceIn(0f, 1f)
+            viewModel?.onTouchAF(xNorm, yNorm)
+            return true
+        }
+
+        override fun onDoubleTap(event: MotionEvent): Boolean {
+            onDoubleTap?.invoke()
+            return true
+        }
+    })
 
     fun init(renderer: MonitorRenderer, vm: MonitorViewModel) {
         viewModel = vm
@@ -23,12 +40,9 @@ class MonitorGLSurfaceView @JvmOverloads constructor(
         renderMode = RENDERMODE_WHEN_DIRTY
     }
 
-    override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (event.action == MotionEvent.ACTION_DOWN || event.action == MotionEvent.ACTION_MOVE) {
-            val xNorm = (event.x / width).coerceIn(0f, 1f)
-            val yNorm = (event.y / height).coerceIn(0f, 1f)
-            viewModel?.onTouchAF(xNorm, yNorm)
-        }
-        return true
+    fun setOnDoubleTapListener(listener: () -> Unit) {
+        onDoubleTap = listener
     }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean = gestures.onTouchEvent(event)
 }

@@ -148,12 +148,15 @@
                 android:background="@drawable/bg_status_dot"/>
 
             <TextView
-                android:layout_width="wrap_content"
+                android:id="@+id/tvUvcStatus"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
                 android:layout_marginStart="4dp"
                 android:layout_marginEnd="16dp"
-                android:text="UVC"
+                android:layout_weight="1"
+                android:maxLines="1"
+                android:text="UVC: connect capture dongle"
                 android:textColor="#888888"
                 android:textSize="10sp"/>
 

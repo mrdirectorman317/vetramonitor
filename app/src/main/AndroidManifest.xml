@@ -3,11 +3,16 @@
 
     <!-- USB host for UVC HDMI capture dongle -->
     <uses-feature android:name="android.hardware.usb.host" android:required="true"/>
+    <uses-feature android:name="android.hardware.camera.any" android:required="false"/>
+    <!-- Android requires CAMERA permission before granting USB video devices -->
+    <uses-permission android:name="android.permission.CAMERA"/>
     <!-- Wi-Fi for Canon CCAPI -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <!-- Keep screen on during monitoring -->
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <!-- Required by AUSBC's optional foreground service on Android 13+ -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <!-- Gallery access for onion skin import -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"

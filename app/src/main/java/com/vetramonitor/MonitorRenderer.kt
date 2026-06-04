@@ -13,7 +13,12 @@ import java.util.concurrent.atomic.AtomicReference
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
-data class FrameData(val bytes: ByteArray, val width: Int, val height: Int)
+data class FrameData(
+    val bytes: ByteArray,
+    val width: Int,
+    val height: Int,
+    val release: () -> Unit,
+)
 
 /**
  * OpenGL ES 3.0 renderer. All GL work stays on the GL thread.
@@ -36,7 +41,8 @@ class MonitorRenderer(
     private var vao = 0
     private var vbo = 0
 
-    private var frameTexId   = 0
+    private var frameYTexId  = 0
+    private var frameVuTexId = 0
     private var falseLutTexId = 0
     private var lut3dTexId   = 0
     private var onionTexId   = 0
@@ -92,14 +98,15 @@ class MonitorRenderer(
         GLES30.glEnableVertexAttribArray(1); GLES30.glVertexAttribPointer(1, 2, GLES30.GL_FLOAT, false, stride, 2 * 4)
         GLES30.glBindVertexArray(0)
 
-        // Allocate 4 textures in one call
-        val ids = IntArray(4); GLES30.glGenTextures(4, ids, 0)
-        frameTexId    = ids[0]
-        falseLutTexId = ids[1]
-        lut3dTexId    = ids[2]
-        onionTexId    = ids[3]
+        // Live NV21 uses separate Y and interleaved VU textures.
+        val ids = IntArray(5); GLES30.glGenTextures(5, ids, 0)
+        frameYTexId   = ids[0]
+        frameVuTexId  = ids[1]
+        falseLutTexId = ids[2]
+        lut3dTexId    = ids[3]
+        onionTexId    = ids[4]
 
-        initFrameTexture()
+        initFrameTextures()
         LutLoader.buildFalseLutInto(falseLutTexId)
         initLut3dIdentity()
         initOnionTexture()
@@ -126,10 +133,11 @@ class MonitorRenderer(
         prog.use()
 
         // Bind textures to units 0-3
-        bindTex2d(0, frameTexId);    prog.setInt("uFrame",    0)
-        bindTex2d(1, falseLutTexId); prog.setInt("uFalseLUT", 1)
-        bindTex3d(2, lut3dTexId);    prog.setInt("uLut3d",    2)
-        bindTex2d(3, onionTexId);    prog.setInt("uOnionTex", 3)
+        bindTex2d(0, frameYTexId);   prog.setInt("uFrameY",   0)
+        bindTex2d(1, frameVuTexId);  prog.setInt("uFrameVU",  1)
+        bindTex2d(2, falseLutTexId); prog.setInt("uFalseLUT", 2)
+        bindTex3d(3, lut3dTexId);    prog.setInt("uLut3d",    3)
+        bindTex2d(4, onionTexId);    prog.setInt("uOnionTex", 4)
 
         // Feature flags
         prog.setBool("uFalseColorEnabled", falseColorEnabled)
@@ -167,6 +175,10 @@ class MonitorRenderer(
     fun setLutStrength(v: Float)         = post { lutStrength       = v }
     fun setOnionOpacity(v: Float)        = post { onionOpacity      = v }
 
+    fun submitFrame(frame: FrameData) {
+        pendingFrame.getAndSet(frame)?.release?.invoke()
+    }
+
     fun load3dLut(size: Int, data: FloatArray) =
         post { LutLoader.upload3dLutInto(lut3dTexId, size, data) }
 
@@ -186,15 +198,22 @@ class MonitorRenderer(
         GLES30.glBindTexture(GLES30.GL_TEXTURE_3D, id)
     }
 
-    private fun initFrameTexture() {
-        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, frameTexId)
+    private fun initFrameTextures() {
+        initFramePlaneTexture(frameYTexId, GLES30.GL_R8, GLES30.GL_RED, 2, 2)
+        initFramePlaneTexture(frameVuTexId, GLES30.GL_RG8, GLES30.GL_RG, 1, 1)
+    }
+
+    private fun initFramePlaneTexture(id: Int, internalFormat: Int, format: Int, width: Int, height: Int) {
+        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, id)
         GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MIN_FILTER, GLES30.GL_LINEAR)
         GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MAG_FILTER, GLES30.GL_LINEAR)
         GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_S, GLES30.GL_CLAMP_TO_EDGE)
         GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_T, GLES30.GL_CLAMP_TO_EDGE)
-        // 2×2 black placeholder
-        val black = ByteBuffer.allocateDirect(16).also { b -> repeat(16) { b.put(0) }; b.rewind() }
-        GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RGBA, 2, 2, 0, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, black)
+        val black = ByteBuffer.allocateDirect(width * height * if (format == GLES30.GL_RG) 2 else 1)
+        GLES30.glTexImage2D(
+            GLES30.GL_TEXTURE_2D, 0, internalFormat, width, height, 0,
+            format, GLES30.GL_UNSIGNED_BYTE, black,
+        )
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, 0)
     }
 
@@ -231,18 +250,45 @@ class MonitorRenderer(
     }
 
     private fun uploadFrame(frame: FrameData) {
-        val (bytes, w, h) = frame
-        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, frameTexId)
-        val buf = ByteBuffer.wrap(bytes)
-        if (w != frameWidth || h != frameHeight) {
-            GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RGBA, w, h, 0,
-                GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, buf)
-            frameWidth = w; frameHeight = h
-        } else {
-            GLES30.glTexSubImage2D(GLES30.GL_TEXTURE_2D, 0, 0, 0, w, h,
-                GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, buf)
+        val (bytes, w, h, release) = frame
+        try {
+            val yBytes = w * h
+            val y = ByteBuffer.wrap(bytes, 0, yBytes)
+            val vu = ByteBuffer.wrap(bytes, yBytes, yBytes / 2)
+            val resize = w != frameWidth || h != frameHeight
+
+            GLES30.glPixelStorei(GLES30.GL_UNPACK_ALIGNMENT, 1)
+            GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, frameYTexId)
+            if (resize) {
+                GLES30.glTexImage2D(
+                    GLES30.GL_TEXTURE_2D, 0, GLES30.GL_R8, w, h, 0,
+                    GLES30.GL_RED, GLES30.GL_UNSIGNED_BYTE, y,
+                )
+            } else {
+                GLES30.glTexSubImage2D(
+                    GLES30.GL_TEXTURE_2D, 0, 0, 0, w, h,
+                    GLES30.GL_RED, GLES30.GL_UNSIGNED_BYTE, y,
+                )
+            }
+
+            GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, frameVuTexId)
+            if (resize) {
+                GLES30.glTexImage2D(
+                    GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RG8, w / 2, h / 2, 0,
+                    GLES30.GL_RG, GLES30.GL_UNSIGNED_BYTE, vu,
+                )
+                frameWidth = w
+                frameHeight = h
+            } else {
+                GLES30.glTexSubImage2D(
+                    GLES30.GL_TEXTURE_2D, 0, 0, 0, w / 2, h / 2,
+                    GLES30.GL_RG, GLES30.GL_UNSIGNED_BYTE, vu,
+                )
+            }
+            GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, 0)
+        } finally {
+            release()
         }
-        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, 0)
     }
 
     private fun uploadOnionBitmap(bitmap: Bitmap) {

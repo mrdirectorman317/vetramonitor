@@ -2,4 +2,7 @@
 <!-- Matches any UVC device (class 0x0e = Video, subclass 0x02 = Streaming) -->
 <resources>
     <usb-device class="0x0e" subclass="0x02"/>
+    <usb-device class="239" subclass="2"/>
+    <!-- Composite HDMI capture dongle detected on the target S25 -->
+    <usb-device vendor-id="13407" product-id="8496"/>
 </resources>

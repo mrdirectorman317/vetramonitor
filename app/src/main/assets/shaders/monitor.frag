@@ -5,7 +5,8 @@ in vec2 vTexCoord;
 out vec4 fragColor;
 
 // ── Textures ────────────────────────────────────────────────────────────────
-uniform sampler2D      uFrame;      // live RGBA frame from UVC dongle
+uniform sampler2D      uFrameY;     // live NV21 luma plane
+uniform sampler2D      uFrameVU;    // live NV21 interleaved chroma plane
 uniform sampler2D      uOnionTex;   // reference frame for onion skin
 uniform sampler2D      uFalseLUT;   // 256×1 luma→colour false-colour ramp
 uniform lowp sampler3D uLut3d;      // 33×33×33 colour-grading LUT (.cube)
@@ -28,17 +29,27 @@ float luma(vec3 c) {
     return dot(c, vec3(0.2126, 0.7152, 0.0722));
 }
 
+vec3 sampleFrame(vec2 uv) {
+    float y = 1.1643 * (texture(uFrameY, uv).r - 0.0625);
+    vec2 vu = texture(uFrameVU, uv).rg - vec2(0.5);
+    return clamp(vec3(
+        y + 1.5958 * vu.x,
+        y - 0.8129 * vu.x - 0.3917 * vu.y,
+        y + 2.0170 * vu.y
+    ), 0.0, 1.0);
+}
+
 // 3×3 Sobel gradient magnitude on the luma channel
 float sobelMag(vec2 uv) {
     vec2 t = uTexelSize;
-    float tl = luma(texture(uFrame, uv + vec2(-t.x,  t.y)).rgb);
-    float tm = luma(texture(uFrame, uv + vec2( 0.0,  t.y)).rgb);
-    float tr = luma(texture(uFrame, uv + vec2( t.x,  t.y)).rgb);
-    float ml = luma(texture(uFrame, uv + vec2(-t.x,  0.0)).rgb);
-    float mr = luma(texture(uFrame, uv + vec2( t.x,  0.0)).rgb);
-    float bl = luma(texture(uFrame, uv + vec2(-t.x, -t.y)).rgb);
-    float bm = luma(texture(uFrame, uv + vec2( 0.0, -t.y)).rgb);
-    float br = luma(texture(uFrame, uv + vec2( t.x, -t.y)).rgb);
+    float tl = texture(uFrameY, uv + vec2(-t.x,  t.y)).r;
+    float tm = texture(uFrameY, uv + vec2( 0.0,  t.y)).r;
+    float tr = texture(uFrameY, uv + vec2( t.x,  t.y)).r;
+    float ml = texture(uFrameY, uv + vec2(-t.x,  0.0)).r;
+    float mr = texture(uFrameY, uv + vec2( t.x,  0.0)).r;
+    float bl = texture(uFrameY, uv + vec2(-t.x, -t.y)).r;
+    float bm = texture(uFrameY, uv + vec2( 0.0, -t.y)).r;
+    float br = texture(uFrameY, uv + vec2( t.x, -t.y)).r;
     float gx = -tl - 2.0*ml - bl + tr + 2.0*mr + br;
     float gy = -tl - 2.0*tm - tr + bl + 2.0*bm + br;
     return sqrt(gx*gx + gy*gy);
@@ -59,7 +70,7 @@ vec3 falseColor(float y) {
 // ── Main ─────────────────────────────────────────────────────────────────────
 void main() {
     // 1. Live frame
-    vec3 color = texture(uFrame, vTexCoord).rgb;
+    vec3 color = sampleFrame(vTexCoord);
 
     // 2. Optional 3-D LUT colour preview (e.g. Canon Log → Rec.709 look)
     if (uLutEnabled) {

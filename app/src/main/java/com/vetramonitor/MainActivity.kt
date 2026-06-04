@@ -1,5 +1,7 @@
 package com.vetramonitor
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
@@ -10,6 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.vetramonitor.databinding.ActivityMainBinding
 import kotlinx.coroutines.launch
@@ -19,10 +22,26 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private val vm: MonitorViewModel by viewModels()
     private lateinit var uvcBridge: UvcBridge
+    private var cleanView = false
 
     private val pickImage = registerForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri: Uri? -> uri?.let { vm.loadOnionFromUri(it) } }
+
+    private val requestCameraPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            uvcBridge.retryCameraPermission()
+        } else {
+            showUvcStatus("UVC: camera permission required. Tap UVC to retry.")
+            Toast.makeText(
+                this,
+                "Allow camera permission so Android can open the HDMI capture dongle",
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,25 +67,44 @@ class MainActivity : AppCompatActivity() {
         // UVC bridge — frames land in the renderer's atomic reference
         uvcBridge = UvcBridge(
             context = this,
-            onFrame = { bytes, w, h ->
-                renderer.pendingFrame.set(FrameData(bytes, w, h))
+            onFrame = { bytes, w, h, release ->
+                renderer.submitFrame(FrameData(bytes, w, h, release))
                 binding.glView.requestRender()
             },
             onConnected    = { runOnUiThread { vm.setUvcConnected(true) } },
             onDisconnected = { runOnUiThread { vm.setUvcConnected(false) } },
+            onStatus = { message ->
+                runOnUiThread { binding.tvUvcStatus.text = message }
+            },
+            onError = { message ->
+                runOnUiThread { Toast.makeText(this, message, Toast.LENGTH_LONG).show() }
+            },
         )
 
         setupControls()
         observeState()
     }
 
-    override fun onStart()   { super.onStart();   uvcBridge.register() }
-    override fun onStop()    { super.onStop();    uvcBridge.unregister(); uvcBridge.closeCamera() }
+    override fun onStart() {
+        super.onStart()
+        uvcBridge.register()
+        if (hasCameraPermission()) {
+            uvcBridge.openCamera()
+        } else {
+            showUvcStatus("UVC: tap UVC and allow camera access")
+        }
+    }
+    override fun onStop()    { super.onStop();    uvcBridge.closeCamera(); uvcBridge.unregister() }
     override fun onResume()  { super.onResume();  binding.glView.onResume() }
     override fun onPause()   { super.onPause();   binding.glView.onPause() }
+    override fun onDestroy() { uvcBridge.release(); super.onDestroy() }
 
     // ── Controls ──────────────────────────────────────────────────────────────
     private fun setupControls() {
+        binding.glView.setOnDoubleTapListener {
+            setCleanView(!cleanView)
+        }
+
         binding.btnFalseColor.setOnClickListener { vm.setFalseColorEnabled(!vm.state.value.falseColorEnabled) }
         binding.btnPeaking.setOnClickListener    { vm.setPeakingEnabled(!vm.state.value.peakingEnabled) }
         binding.btnLut.setOnClickListener        { vm.setLutEnabled(!vm.state.value.lutEnabled) }
@@ -96,7 +134,14 @@ class MainActivity : AppCompatActivity() {
             else Toast.makeText(this, "Connect to CCAPI first", Toast.LENGTH_SHORT).show()
         }
 
-        binding.btnOpenUvc.setOnClickListener { uvcBridge.openCamera() }
+        binding.btnOpenUvc.setOnClickListener {
+            if (hasCameraPermission()) {
+                uvcBridge.retryCameraPermission()
+            } else {
+                showUvcStatus("UVC: allow camera access in the Android prompt")
+                requestCameraPermission.launch(Manifest.permission.CAMERA)
+            }
+        }
     }
 
     private fun observeState() {
@@ -116,7 +161,8 @@ class MainActivity : AppCompatActivity() {
                 binding.indicatorCcapi.isActivated = s.ccapiConnected
 
                 // Recording dot
-                binding.recordingDot.visibility = if (s.recording) View.VISIBLE else View.GONE
+                binding.recordingDot.visibility =
+                    if (s.recording && !cleanView) View.VISIBLE else View.GONE
 
                 // Onion controls
                 val showOnion = s.onionEnabled || s.onionHasFrame
@@ -146,5 +192,21 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             .show()
+    }
+
+    private fun hasCameraPermission(): Boolean =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
+            PackageManager.PERMISSION_GRANTED
+
+    private fun showUvcStatus(message: String) {
+        binding.tvUvcStatus.text = message
+    }
+
+    private fun setCleanView(enabled: Boolean) {
+        cleanView = enabled
+        binding.hudTop.visibility = if (enabled) View.GONE else View.VISIBLE
+        binding.bottomPanel.visibility = if (enabled) View.GONE else View.VISIBLE
+        binding.recordingDot.visibility =
+            if (!enabled && vm.state.value.recording) View.VISIBLE else View.GONE
     }
 }

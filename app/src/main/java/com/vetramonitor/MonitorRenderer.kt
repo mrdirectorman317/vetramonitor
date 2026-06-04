@@ -199,17 +199,28 @@ class MonitorRenderer(
     }
 
     private fun initFrameTextures() {
-        initFramePlaneTexture(frameYTexId, GLES30.GL_R8, GLES30.GL_RED, 2, 2)
-        initFramePlaneTexture(frameVuTexId, GLES30.GL_RG8, GLES30.GL_RG, 1, 1)
+        initFramePlaneTexture(frameYTexId, GLES30.GL_R8, GLES30.GL_RED, 2, 2, 16)
+        initFramePlaneTexture(frameVuTexId, GLES30.GL_RG8, GLES30.GL_RG, 1, 1, 128)
     }
 
-    private fun initFramePlaneTexture(id: Int, internalFormat: Int, format: Int, width: Int, height: Int) {
+    private fun initFramePlaneTexture(
+        id: Int,
+        internalFormat: Int,
+        format: Int,
+        width: Int,
+        height: Int,
+        fill: Int,
+    ) {
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, id)
         GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MIN_FILTER, GLES30.GL_LINEAR)
         GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MAG_FILTER, GLES30.GL_LINEAR)
         GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_S, GLES30.GL_CLAMP_TO_EDGE)
         GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_T, GLES30.GL_CLAMP_TO_EDGE)
         val black = ByteBuffer.allocateDirect(width * height * if (format == GLES30.GL_RG) 2 else 1)
+            .also { buffer ->
+                repeat(buffer.capacity()) { buffer.put(fill.toByte()) }
+                buffer.rewind()
+            }
         GLES30.glTexImage2D(
             GLES30.GL_TEXTURE_2D, 0, internalFormat, width, height, 0,
             format, GLES30.GL_UNSIGNED_BYTE, black,
@@ -253,8 +264,15 @@ class MonitorRenderer(
         val (bytes, w, h, release) = frame
         try {
             val yBytes = w * h
-            val y = ByteBuffer.wrap(bytes, 0, yBytes)
-            val vu = ByteBuffer.wrap(bytes, yBytes, yBytes / 2)
+            val source = ByteBuffer.wrap(bytes)
+            val y = source.duplicate().apply {
+                position(0)
+                limit(yBytes)
+            }.slice()
+            val vu = source.duplicate().apply {
+                position(yBytes)
+                limit(bytes.size)
+            }.slice()
             val resize = w != frameWidth || h != frameHeight
 
             GLES30.glPixelStorei(GLES30.GL_UNPACK_ALIGNMENT, 1)

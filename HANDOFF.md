@@ -15,6 +15,20 @@ The optimized video path builds and its shader loads without errors, but its
 latency still needs to be compared with the Play Store UVC app while the
 physical dongle is connected.
 
+### June 4 regression repair
+
+The first latency-optimized checkpoint incorrectly read `Size.fps`, which can
+be null on this dongle, and preview failed with a null-FPS error. With no frame
+available, an incorrectly initialized VU placeholder made the screen green.
+
+The installed repair:
+
+- no longer reads the dongle's nullable FPS array
+- restores the previously proven UVC preview range of 1-31 fps
+- initializes the no-frame Y/VU textures to neutral black
+- uploads Y and VU using explicit buffer slices so the chroma plane starts at
+  the correct offset
+
 ## User Controls
 
 - Tap **UVC** to retry USB permission/device connection.
@@ -51,7 +65,7 @@ physical dongle is connected.
 - Composite USB video devices are detected by inspecting their interfaces.
 - Preview modes are read from the dongle, capped at 1920x1080, and negotiated
   using MJPEG first with YUYV fallback.
-- The app permits advertised preview rates up to 60 fps.
+- Preview negotiation currently uses the library's proven 1-31 fps range.
 - The known dongle VID/PID is included in `usb_device_filter.xml`.
 
 ### Latency work
@@ -130,6 +144,8 @@ samples the Y texture directly for its Sobel pass.
 - Debug APK installs and cold-launches on the S25.
 - `CAMERA` runtime permission is declared and granted.
 - No VetraMonitor crash or shader compilation error in final logcat check.
+- After the null-FPS repair, the no-device screen was verified as neutral black
+  rather than green.
 - Double-tap clean view verified on-device:
   - before: eight HUD/control elements visible
   - after double-tap: zero visible

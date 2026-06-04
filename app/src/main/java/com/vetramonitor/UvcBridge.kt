@@ -18,7 +18,6 @@ import com.serenegiant.usb.UVCCamera
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
-import kotlin.math.ceil
 
 /**
  * Opens a UVC capture dongle and delivers RGBA frames to the monitor renderer.
@@ -216,7 +215,7 @@ class UvcBridge(
         val modes = listOf(UVCCamera.FRAME_FORMAT_MJPEG, UVCCamera.FRAME_FORMAT_YUYV)
             .flatMap { format ->
                 camera.getSupportedSizeList(format).orEmpty().map { size ->
-                    PreviewMode(size, format, size.fps.maxOrNull() ?: 30f)
+                    PreviewMode(size, format)
                 }
             }
             .filter { it.width > 0 && it.height > 0 }
@@ -230,7 +229,6 @@ class UvcBridge(
                     abs(ratio - TARGET_ASPECT)
                 }.thenByDescending { it.size.width * it.size.height }
                     .thenBy { if (it.format == UVCCamera.FRAME_FORMAT_MJPEG) 0 else 1 }
-                    .thenByDescending { it.maxFps }
             )
 
         if (candidates.isEmpty()) {
@@ -245,10 +243,7 @@ class UvcBridge(
                     mode.size.width,
                     mode.size.height,
                     UVCCamera.DEFAULT_PREVIEW_MIN_FPS,
-                    ceil(mode.maxFps + 0.5f).toInt().coerceIn(
-                        UVCCamera.DEFAULT_PREVIEW_MAX_FPS,
-                        MAX_PREVIEW_FPS,
-                    ),
+                    UVCCamera.DEFAULT_PREVIEW_MAX_FPS,
                     mode.format,
                     UVCCamera.DEFAULT_BANDWIDTH,
                 )
@@ -353,11 +348,11 @@ class UvcBridge(
         }
     }
 
-    private data class PreviewMode(val size: Size, val format: Int, val maxFps: Float) {
+    private data class PreviewMode(val size: Size, val format: Int) {
         val width: Int get() = size.width
         val height: Int get() = size.height
         val description: String
-            get() = "${size.width}x${size.height} ${if (format == UVCCamera.FRAME_FORMAT_MJPEG) "MJPEG" else "YUYV"} @${maxFps.toInt()}"
+            get() = "${size.width}x${size.height} ${if (format == UVCCamera.FRAME_FORMAT_MJPEG) "MJPEG" else "YUYV"}"
     }
 
     companion object {
@@ -366,7 +361,6 @@ class UvcBridge(
         private const val TARGET_ASPECT = 16.0 / 9.0
         private const val MAX_PREVIEW_WIDTH = 1920
         private const val MAX_PREVIEW_HEIGHT = 1080
-        private const val MAX_PREVIEW_FPS = 61
     }
 }
 

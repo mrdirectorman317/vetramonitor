@@ -1,0 +1,3 @@
+-keepattributes *Annotation*
+-keep class com.jiangdg.ausbc.** { *; }
+-keep class com.vetramonitor.** { *; }

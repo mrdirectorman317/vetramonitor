@@ -1,0 +1,278 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000">
+
+    <!-- Full-screen GL surface -->
+    <com.vetramonitor.MonitorGLSurfaceView
+        android:id="@+id/glView"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+    <!-- Top HUD: ISO / aperture / shutter -->
+    <LinearLayout
+        android:id="@+id/hudTop"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="6dp"
+        android:background="#99000000"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:id="@+id/tvIso"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="ISO --"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:fontFamily="monospace"/>
+
+        <TextView
+            android:id="@+id/tvAperture"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="f/--"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:fontFamily="monospace"/>
+
+        <TextView
+            android:id="@+id/tvShutter"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="end"
+            android:text="--"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:fontFamily="monospace"/>
+
+    </LinearLayout>
+
+    <!-- Recording indicator dot (top-left corner) -->
+    <View
+        android:id="@+id/recordingDot"
+        android:layout_width="12dp"
+        android:layout_height="12dp"
+        android:layout_margin="14dp"
+        android:background="@drawable/bg_rec_dot"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/hudTop"
+        app:layout_constraintStart_toStartOf="parent"/>
+
+    <!-- Bottom control panel -->
+    <LinearLayout
+        android:id="@+id/bottomPanel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="6dp"
+        android:background="#CC000000"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Assist + action buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <Button
+                android:id="@+id/btnFalseColor"
+                style="@style/Widget.VetraMonitor.AssistButton"
+                android:text="FC"/>
+
+            <Button
+                android:id="@+id/btnPeaking"
+                style="@style/Widget.VetraMonitor.AssistButton"
+                android:text="PEAK"/>
+
+            <Button
+                android:id="@+id/btnLut"
+                style="@style/Widget.VetraMonitor.AssistButton"
+                android:text="LUT"/>
+
+            <Button
+                android:id="@+id/btnOnion"
+                style="@style/Widget.VetraMonitor.AssistButton"
+                android:text="ONION"/>
+
+            <Space android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1"/>
+
+            <Button
+                android:id="@+id/btnRecord"
+                style="@style/Widget.VetraMonitor.AssistButton"
+                android:text="REC"/>
+
+            <Button
+                android:id="@+id/btnConnect"
+                style="@style/Widget.VetraMonitor.AssistButton"
+                android:text="CCAPI"/>
+
+            <Button
+                android:id="@+id/btnOpenUvc"
+                style="@style/Widget.VetraMonitor.AssistButton"
+                android:text="UVC"/>
+
+        </LinearLayout>
+
+        <!-- Status indicators -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingTop="3dp">
+
+            <View
+                android:id="@+id/indicatorUvc"
+                android:layout_width="8dp"
+                android:layout_height="8dp"
+                android:layout_gravity="center_vertical"
+                android:background="@drawable/bg_status_dot"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="16dp"
+                android:text="UVC"
+                android:textColor="#888888"
+                android:textSize="10sp"/>
+
+            <View
+                android:id="@+id/indicatorCcapi"
+                android:layout_width="8dp"
+                android:layout_height="8dp"
+                android:layout_gravity="center_vertical"
+                android:background="@drawable/bg_status_dot"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_marginStart="4dp"
+                android:text="CCAPI"
+                android:textColor="#888888"
+                android:textSize="10sp"/>
+
+        </LinearLayout>
+
+        <!-- Onion skin controls (opacity + grab/load buttons) -->
+        <LinearLayout
+            android:id="@+id/onionControls"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingTop="2dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Ghost"
+                android:textColor="#AAAAAA"
+                android:textSize="11sp"
+                android:layout_marginEnd="6dp"/>
+
+            <com.google.android.material.slider.Slider
+                android:id="@+id/sliderOnionOpacity"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:valueFrom="0.0"
+                android:valueTo="1.0"
+                android:value="0.4"
+                android:stepSize="0.05"/>
+
+            <Button
+                android:id="@+id/btnGrabOnion"
+                style="@style/Widget.VetraMonitor.AssistButton"
+                android:text="GRAB"/>
+
+            <Button
+                android:id="@+id/btnLoadOnion"
+                style="@style/Widget.VetraMonitor.AssistButton"
+                android:text="LOAD"/>
+
+        </LinearLayout>
+
+        <!-- Focus peaking threshold slider -->
+        <LinearLayout
+            android:id="@+id/peakingControls"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingTop="2dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Threshold"
+                android:textColor="#AAAAAA"
+                android:textSize="11sp"
+                android:layout_marginEnd="6dp"/>
+
+            <com.google.android.material.slider.Slider
+                android:id="@+id/sliderPeakThreshold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:valueFrom="0.02"
+                android:valueTo="0.30"
+                android:value="0.08"
+                android:stepSize="0.01"/>
+
+        </LinearLayout>
+
+        <!-- LUT strength slider -->
+        <LinearLayout
+            android:id="@+id/lutControls"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingTop="2dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="LUT mix"
+                android:textColor="#AAAAAA"
+                android:textSize="11sp"
+                android:layout_marginEnd="6dp"/>
+
+            <com.google.android.material.slider.Slider
+                android:id="@+id/sliderLutStrength"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:valueFrom="0.0"
+                android:valueTo="1.0"
+                android:value="1.0"
+                android:stepSize="0.05"/>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

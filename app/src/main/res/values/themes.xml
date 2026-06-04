@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.VetraMonitor" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/accent_green</item>
+        <item name="colorOnPrimary">@color/black</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/on_surface</item>
+        <item name="android:windowBackground">@color/black</item>
+        <item name="android:statusBarColor">@color/black</item>
+        <item name="android:navigationBarColor">@color/black</item>
+    </style>
+
+    <!-- Compact monitor button: dark fill, green when selected -->
+    <style name="Widget.VetraMonitor.AssistButton" parent="Widget.Material3.Button.TonalButton">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">32dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="android:paddingHorizontal">10dp</item>
+        <item name="android:paddingVertical">0dp</item>
+        <item name="android:layout_marginHorizontal">3dp</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:textColor">@color/on_surface</item>
+        <item name="backgroundTint">@color/button_selector</item>
+    </style>
+
+</resources>
